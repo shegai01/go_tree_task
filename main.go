@@ -8,12 +8,14 @@ import (
 
 func main() {
 	out := os.Stdout
-	if !(len(os.Args) == 2 || len(os.Args) == 3) {
+
+	if len(os.Args) != 2 && len(os.Args) != 3 {
 		panic("usage go run main.go . [-f]")
 	}
 
 	path := os.Args[1]
 	printFiles := len(os.Args) == 3 && os.Args[2] == "-f"
+
 	err := dirTree(out, path, printFiles)
 	if err != nil {
 		panic(err.Error())
@@ -21,15 +23,16 @@ func main() {
 }
 
 func dirTree(out io.Writer, path string, printFiles bool) error {
-	return helper(out, path, printFiles, "")
+	return buildTree(out, path, "", printFiles)
 }
 
-func helper(out io.Writer, path string, printFiles bool, prefix string) error {
-	var (
-		last      string = "└───"
-		emptyFile string = "empty"
-		notLast   string = "├───"
+func buildTree(out io.Writer, path, prefix string, printFiles bool) error { //
+	const (
+		last    string = "└───"
+		notLast string = "├───"
 	)
+
+	emptyFile := "empty"
 
 	files, err := filter(path, printFiles)
 	if err != nil {
@@ -44,20 +47,25 @@ func helper(out io.Writer, path string, printFiles bool, prefix string) error {
 
 		sizeInfo := info.Size()
 
-		if sizeInfo != 0 {
-			emptyFile = fmt.Sprintf("%db", sizeInfo)
-		}
-
 		if f.IsDir() {
 			if i == len(files)-1 {
 				fmt.Fprintf(out, prefix+last+f.Name()+"\n")
-				helper(out, path+"/"+f.Name(), printFiles, prefix+"\t")
+
+				if err := buildTree(out, path+"/"+f.Name(), prefix+"\t", printFiles); err != nil {
+					return err
+				}
 			} else {
 				fmt.Fprintf(out, prefix+notLast+f.Name()+"\n")
-				helper(out, path+"/"+f.Name(), printFiles, prefix+"│\t")
+
+				if err := buildTree(out, path+"/"+f.Name(), prefix+"│\t", printFiles); err != nil {
+					return err
+				}
+			}
+		} else {
+			if sizeInfo > 0 {
+				emptyFile = fmt.Sprintf("%db", sizeInfo)
 			}
 
-		} else {
 			if i == len(files)-1 {
 				fmt.Fprintf(out, prefix+last+f.Name()+" (%s)\n", emptyFile)
 			} else {
@@ -78,7 +86,6 @@ func filter(path string, printFiles bool) ([]os.DirEntry, error) {
 	}
 
 	for _, file := range files {
-
 		if file.IsDir() {
 			out = append(out, file)
 		} else if printFiles {
