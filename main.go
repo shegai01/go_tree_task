@@ -32,63 +32,66 @@ func buildTree(out io.Writer, path, prefix string, printFiles bool) error { //
 		notLast string = "├───"
 	)
 
-	files, err := getFile(path, printFiles)
+	emptyFile := "empty"
+
+	files, err := filter(path, printFiles)
 	if err != nil {
 		return err
 	}
-	for _, f := range files {
-		if f.IsDir() {
-			fmt.Fprintf(out, prefix+last+f.Name()+"\n")
 
-			if err = buildTree(out, path+"/"+f.Name(), prefix+"\t", printFiles); err != nil {
-				return err
-			}
-			// } else {
-			// 	fmt.Fprintf(out, prefix+notLast+f.Name()+"\n")
-			// }
-			// 	if err := buildTree(out, path+"/"+f.Name(), prefix+"│\t", printFiles); err != nil {
-			// 		return err
-			// 	}
-
-		} else {
-			sizeInfo, errSize := getSize(f)
-			if err != nil {
-				return errSize
-			}
-
-			// fmt.Fprintf(out, prefix+last+f.Name()+" (%s)\n", sizeInfo)
-
-			fmt.Fprintf(out, prefix+notLast+f.Name()+" (%s)\n", sizeInfo)
+	for i, f := range files {
+		info, err := f.Info()
+		if err != nil {
+			return err
 		}
 
+		sizeInfo := info.Size()
+
+		if f.IsDir() {
+			if i == len(files)-1 {
+				fmt.Fprintf(out, prefix+last+f.Name()+"\n")
+
+				if err := buildTree(out, path+"/"+f.Name(), prefix+"\t", printFiles); err != nil {
+					return err
+				}
+			} else {
+				fmt.Fprintf(out, prefix+notLast+f.Name()+"\n")
+
+				if err := buildTree(out, path+"/"+f.Name(), prefix+"│\t", printFiles); err != nil {
+					return err
+				}
+			}
+		} else {
+			if sizeInfo > 0 {
+				emptyFile = fmt.Sprintf("%db", sizeInfo)
+			}
+
+			if i == len(files)-1 {
+				fmt.Fprintf(out, prefix+last+f.Name()+" (%s)\n", emptyFile)
+			} else {
+				fmt.Fprintf(out, prefix+notLast+f.Name()+" (%s)\n", emptyFile)
+			}
+		}
 	}
+
 	return nil
 }
 
-func getFile(path string, printFiles bool) ([]os.DirEntry, error) {
-	var res []os.DirEntry
+func filter(path string, printFiles bool) ([]os.DirEntry, error) {
+	out := []os.DirEntry{}
+
 	files, err := os.ReadDir(path)
 	if err != nil {
 		return nil, err
 	}
 
 	for _, file := range files {
-		if file.IsDir() || printFiles {
-			res = append(res, file)
+		if file.IsDir() {
+			out = append(out, file)
+		} else if printFiles {
+			out = append(out, file)
 		}
 	}
 
-	return nil, err
-}
-
-func getSize(file os.DirEntry) (string, error) {
-	emptyFile := "empty"
-
-	info, err := file.Info()
-	if info.Size() != 0 {
-		emptyFile = fmt.Sprintf("%db", info.Size())
-		return emptyFile, nil
-	}
-
-	return "emptyFile", err
+	return out, nil
 }
