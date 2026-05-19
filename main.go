@@ -62,7 +62,6 @@ func buildTree(out io.Writer, path, prefix string, printFiles bool) error { //
 			if err = buildTree(out, path+"/"+f.Name(), newPrefix, printFiles); err != nil {
 				return err
 			}
-
 		} else {
 			sizeInfo, errSize := getSize(f)
 			if err != nil {
